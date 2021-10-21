@@ -21,12 +21,13 @@ variable "networks" { type=list(string) }
 
 
 data "google_compute_network" "networks" {
-	for_each = toset(var.networks)
-	name = each.value
+	for_each  = toset(var.networks)
+  project   = var.project
+	name      = each.value
 }
 
 
-resource "google_dns_managed_zone" "dns_googleapis" {
+resource "google_dns_managed_zone" "googleapis_com" {
   project     = var.project
   name        = var.dns_googleapis_name
   dns_name    = "googleapis.com."
@@ -38,35 +39,55 @@ resource "google_dns_managed_zone" "dns_googleapis" {
 
     content {
       networks {
-        network_url = private_visibility_config.self_link
+        network_url = private_visibility_config.value.self_link
       }
     }
   }
 }
 
 
-resource "google_dns_managed_zone" "dns_gcr_io" {
+resource "google_dns_managed_zone" "gcr_io" {
   project     = var.project
   name        = var.dns_container_registry_name
   dns_name    = "gcr.io."
   description = "Private zone for Google Container Registry (GCR)"
   visibility  = "private"
+
+  dynamic "private_visibility_config" {
+    for_each = data.google_compute_network.networks
+
+    content {
+      networks {
+        network_url = private_visibility_config.value.self_link
+      }
+    }
+  }
 }
 
 
-resource "google_dns_managed_zone" "dns_pkg_dev" {
+resource "google_dns_managed_zone" "pkg_dev" {
   project     = var.project
   name        = var.dns_artifact_registry_name
   dns_name    = "pkg.dev."
   description = "Private zone for Google Artifact Registry"
   visibility  = "private"
+
+  dynamic "private_visibility_config" {
+    for_each = data.google_compute_network.networks
+
+    content {
+      networks {
+        network_url = private_visibility_config.value.self_link
+      }
+    }
+  }
 }
 
 
-resource "google_dns_record_set" "cname_googleapis_com" {
+resource "google_dns_record_set" "googleapis_com" {
   project       = var.project
   name          = "*.googleapis.com."
-  managed_zone  = google_dns_managed_zone.dns_googleapis.name
+  managed_zone  = google_dns_managed_zone.googleapis_com.name
   type          = "CNAME"
   ttl           = 300
   rrdatas       = ["restricted.googleapis.com."]
@@ -78,7 +99,7 @@ resource "google_dns_record_set" "restricted_googleapis_com" {
   name          = "restricted.googleapis.com."
   type          = "A"
   ttl           = 300
-  managed_zone  = google_dns_managed_zone.dns_googleapis.name
+  managed_zone  = google_dns_managed_zone.googleapis_com.name
   rrdatas       = [
     "199.36.153.4",
     "199.36.153.5",
@@ -91,19 +112,19 @@ resource "google_dns_record_set" "restricted_googleapis_com" {
 resource "google_dns_record_set" "alias_gcr_io" {
   project       = var.project
   name          = "*.gcr.io."
-  managed_zone  = google_dns_managed_zone.dns_gcr_io.name
+  managed_zone  = google_dns_managed_zone.gcr_io.name
   type          = "CNAME"
   ttl           = 300
   rrdatas       = ["gcr.io."]
 }
 
 
-resource "google_dns_record_set" "all_gcr_io" {
+resource "google_dns_record_set" "gcr_io" {
   project       = var.project
   name          = "gcr.io."
   type          = "A"
   ttl           = 300
-  managed_zone  = google_dns_managed_zone.dns_gcr_io.name
+  managed_zone  = google_dns_managed_zone.gcr_io.name
   rrdatas       = [
     "199.36.153.4",
     "199.36.153.5",
@@ -117,19 +138,19 @@ resource "google_dns_record_set" "all_gcr_io" {
 resource "google_dns_record_set" "alias_pkg_dev" {
   project       = var.project
   name          = "*.pkg.dev."
-  managed_zone  = google_dns_managed_zone.dns_pkg_dev.name
+  managed_zone  = google_dns_managed_zone.pkg_dev.name
   type          = "CNAME"
   ttl           = 300
   rrdatas       = ["pkg.dev."]
 }
 
 
-resource "google_dns_record_set" "all_pkg_dev" {
+resource "google_dns_record_set" "pkg_dev" {
   project       = var.project
   name          = "pkg.dev."
   type          = "A"
   ttl           = 300
-  managed_zone  = google_dns_managed_zone.dns_pkg_dev.name
+  managed_zone  = google_dns_managed_zone.pkg_dev.name
   rrdatas       = [
     "199.36.153.4",
     "199.36.153.5",
