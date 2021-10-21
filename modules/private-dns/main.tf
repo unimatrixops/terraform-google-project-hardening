@@ -21,9 +21,9 @@ variable "networks" { type=list(string) }
 
 
 data "google_compute_network" "networks" {
-	for_each  = toset(var.networks)
+  for_each  = toset(var.networks)
   project   = var.project
-	name      = each.value
+  name      = each.value
 }
 
 
